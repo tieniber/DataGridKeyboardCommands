@@ -183,7 +183,34 @@ define([
         _attachListenersToGridRows: function() {
             this._grid._gridRowNodes.forEach(dojoLang.hitch(this, function(node) {
                 this.connect(node, "click", dojoLang.hitch(this, function(e) {
+                    if (e.shiftKey && this._anchorRow) {
+                        // cancel the bubble --> disable the mendix events
+                        e.cancelBubble = true;
+                        // shift key was clicked, select everything between the focused row and this one
+                        console.log("shifty");
+                        var a = this._anchorRow,
+                            b = this._recursivelyFindTableRowParent(e.target),
+                            collecting = false,
+                            set = [],
+                            obj = null;
+                        Array.from(a.parentElement.children).forEach(dojoLang.hitch(this, function(element) {
+                            if (element === a || element === b) {
+                                collecting = !collecting;
+                                set.push(element);
+                            } else if (collecting) {
+                                set.push(element);
+                            }
+                        }));
+                        set.forEach(dojoLang.hitch(this, function(tr) {
+                            obj = this._grid._getObjectFromNode(tr);
+                            this._grid._addToSelection(obj.getGuid());
+                            this._grid.selectRow(tr);
+                        }));
+                        document.getSelection().removeAllRanges(); // remove all the highlighted text from the DOM
+                    }
                     this._anchorRow = this._recursivelyFindTableRowParent(e.target);
+                    this._direction = null;
+
                 }));
             }));
         }
