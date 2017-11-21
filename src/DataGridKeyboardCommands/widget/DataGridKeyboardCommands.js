@@ -23,6 +23,10 @@ define([
         _handles: null,
         _contextObj: null,
         _grid: null,
+        _anchorRow: null,
+
+        KEY_UP: 38,
+        KEY_DOWN: 40,
 
         constructor: function() {
             this._handles = [];
@@ -72,30 +76,57 @@ define([
         _onKeyPress: function(e) {
             var key = e.keyCode ? e.keyCode : e.which;
             var rowToSelect;
-            var controlCommandKeyPressed = this._isMacintosh() ? e.metaKey : e.ctrlKey;
-            if (controlCommandKeyPressed && (key === 40 || key === 38)) {
+            var shiftKeyPressed = e.shiftKey;
+            // shift is pressed and key is up or down
+            if (shiftKeyPressed && (key === this.KEY_UP || key === this.KEY_DOWN)) {
+                // find the anchor
+                // if only one row, it's the anchor, else...
+                // this._anchorRow = this._anchorRow || dojoQuery(".selected", this._grid.domNode)[0];
                 var focusRow = dojoQuery(".mx-focus", this._grid.domNode)[0];
+                // if the focus row is selected
                 if (focusRow && dojoClass.contains(focusRow, "selected")) {
-
-                    if (key === 40) {
+                    // find the next seelcted row
+                    if (key === this.KEY_DOWN) {
                         rowToSelect = focusRow.nextSibling;
-                    } else if (key === 38) {
+                    } else if (key === this.KEY_UP) {
                         rowToSelect = focusRow.previousSibling;
                     }
                     if (rowToSelect) {
-                        var obj = this._grid._getObjectFromNode(rowToSelect);
-                        if (obj) {
-                            this._grid._addToSelection(obj.getGuid());
-                            this._grid.selectRow(rowToSelect);
-                        } else {
-                            console.error("While selecting a row, could not find mx object related to row.");
-                        }
+                        this._toggleSelectedRow(focusRow, rowToSelect);
+                        // remove focus from the original row
+                        dojoClass.remove(focusRow, "mx-focus");
+                        dojoClass.add(rowToSelect, "mx-focus");
+                        // var obj = this._grid._getObjectFromNode(rowToSelect);
+                        // if (obj) {
+                        //     this._grid._addToSelection(obj.getGuid());
+                        //     this._grid.selectRow(rowToSelect);
+                        //     dojoClass.add(rowToSelect, "mx-focus");
+                        //     dojoClass.remove(focusRow, "mx-focus");
+                        // } else {
+                        //     console.error("While selecting a row, could not find mx object related to row.");
+                        // }
                     }
                 }
             }
         },
         _isMacintosh: function() {
             return navigator.platform.indexOf("Mac") > -1;
+        },
+        _toggleSelectedRow: function(fromRow, toRow) {
+            var obj;
+            if (dojoClass.contains(toRow, "selected")) {
+                // deselect
+                obj = this._grid._getObjectFromNode(fromRow);
+                this._grid._removeFromSelection(obj.getGuid());
+                this._grid.deselectRow(fromRow);
+                // dojoClass.remove(fromRow, "mx-focus");
+            } else {
+                // add
+                obj = this._grid._getObjectFromNode(toRow);
+                this._grid._addToSelection(obj.getGuid());
+                this._grid.selectRow(toRow);
+                // dojoClass.add(toRow, "mx-focus");
+            }
         }
     });
 });
