@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<widget id="DataGridKeyboardCommands.widget.DataGridKeyboardCommands" needsEntityContext="false" xmlns="http://www.mendix.com/widget/1.0/">
+    <name>DataGridKeyboardCommands</name>
+    <description>The description of this widget.</description>
+
+    <icon />
+
+    <properties>
+		<property key="targetGridName" type="string" required="true" defaultValue="">
+            <caption>Grid Name</caption>
+            <category>Appearance</category>
+            <description>The name of the grid on this page, as configured in the modeler.</description>
+        </property>
+    </properties>
+</widget>
