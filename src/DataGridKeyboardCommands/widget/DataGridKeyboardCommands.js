@@ -82,34 +82,32 @@ define([
             }
         },
         _onKeyPress: function(e) {
-            var key = e.keyCode ? e.keyCode : e.which;
-            var rowToSelect;
-            var shiftKeyPressed = e.shiftKey;
-            // shift is pressed and key is up or down
-            if (shiftKeyPressed && (key === this.KEY_UP || key === this.KEY_DOWN)) {
-                this._direction = this._direction || key; //cache
-                var modKeyPressed = this._isMacintosh() ? e.metaKey : e.ctrlKey;
-                var focusRow = dojoQuery(".mx-focus", this._grid.domNode)[0];
-                if (modKeyPressed) {
+            e.cancelBubble = true; // stop the mendix events
+            e.preventDefault(); // stop the browser events (scrolling)
+            var key = e.keyCode ? e.keyCode : e.which,
+                rowToSelect = null,
+                shiftKeyPressed = e.shiftKey,
+                focusRow = dojoQuery(".mx-focus", this._grid.domNode)[0],
+                modKeyPressed = this._isMacintosh() ? e.metaKey : e.ctrlKey;
+            // if the arrow keys are pressed
+            if (key === this.KEY_UP || key === this.KEY_DOWN) {
+                // find the next seelcted row
+                var firstSelected = dojoQuery(".selected", this._grid.domNode)[0],
+                    lastSelected = dojoQuery(".selected", this._grid.domNode)[dojoQuery(".selected", this._grid.domNode).length - 1];
+                rowToSelect = shiftKeyPressed ? (key === this.KEY_DOWN ? focusRow.nextSibling : focusRow.previousSibling) : (key === this.KEY_DOWN ? lastSelected.nextSibling : firstSelected.previousSibling);
+                if (shiftKeyPressed && modKeyPressed) {
                     this._doJumpSelect(focusRow, key);
-                } else {
-                    // if the focus row is selected
+                } else if (shiftKeyPressed) {
                     if (focusRow && dojoClass.contains(focusRow, "selected")) {
-                        // find the next seelcted row
-                        if (key === this.KEY_DOWN) {
-                            rowToSelect = focusRow.nextSibling;
-                        } else if (key === this.KEY_UP) {
-                            rowToSelect = focusRow.previousSibling;
-                        }
                         if (rowToSelect) {
                             this._toggleSelectedRow(focusRow, rowToSelect, key);
                         }
                     }
+                } else if (rowToSelect) {
+                    rowToSelect = (key === this.KEY_DOWN ? lastSelected.nextSibling : firstSelected.previousSibling);
+                    this._moveSelection(rowToSelect);
                 }
             }
-        },
-        _onClickRowNode: function(e) {
-            console.log(e.target);
         },
         _isMacintosh: function() {
             return navigator.platform.indexOf("Mac") > -1;
@@ -134,16 +132,12 @@ define([
             var obj;
             if (dojoClass.contains(toRow, "selected") && key !== this._direction) {
                 // deselect
-                obj = this._grid._getObjectFromNode(fromRow);
-                this._grid._removeFromSelection(obj.getGuid());
-                this._grid.deselectRow(fromRow);
+                this._removeFromSelection(fromRow)
             } else if (!dojoClass.contains(toRow, "selected")) {
                 // add
-                obj = this._grid._getObjectFromNode(toRow);
-                this._grid._addToSelection(obj.getGuid());
-                this._grid.selectRow(toRow);
+                this._addToSelection(toRow);
             }
-            this._transferFocus(fromRow, toRow, false);
+            this._transferFocus(toRow, false);
             // if moving from anchor, reset the direction
             if (fromRow === this._anchorRow) {
                 this._direction = key;
@@ -197,8 +191,8 @@ define([
                         this._selectRowsInSet(set);
                         document.getSelection().removeAllRanges(); // remove all the highlighted text from the DOM
                     }
-                    this._anchorRow = this._recursivelyFindTableRowParent(e.target);
-                    this._direction = null;
+                    var newAnchor = this._recursivelyFindTableRowParent(e.target);
+                    this._resetAnchorPosition(newAnchor);
 
                 }));
             }));
@@ -213,11 +207,21 @@ define([
          * @since Nov 21, 2017
          */
         _selectRowsInSet: function(set) {
-            var obj;
             set.forEach(dojoLang.hitch(this, function(tr) {
-                obj = this._grid._getObjectFromNode(tr);
-                this._grid._addToSelection(obj.getGuid());
-                this._grid.selectRow(tr);
+                this._addToSelection(tr);
+            }));
+        },
+        /**
+         * Remove Rows In Set
+         * ---
+         * Remove all the rows in a given array
+         * @param {Array::HTMLElement} set - the <tr> elements to remove
+         * @author Conner Charlebois
+         * @since Nov 21, 2017
+         */
+        _removeRowsInSet: function(set) {
+            set.forEach(dojoLang.hitch(this, function(tr) {
+                this._removeFromSelection(tr);
             }));
         },
 
@@ -238,7 +242,7 @@ define([
             if (direction === this.KEY_UP) {
                 for (var k = i - 1; k >= 0 && !focused; k--) {
                     if (dojoClass.contains(this._grid._gridRowNodes[k], "selected")) {
-                        this._transferFocus(fromRow, this._grid._gridRowNodes[k], true);
+                        this._transferFocus(this._grid._gridRowNodes[k], true);
                         focused = true;
                     } else {
                         set.push(this._grid._gridRowNodes[k]);
@@ -247,7 +251,7 @@ define([
             } else {
                 for (var j = i + 1; j < this._grid._gridRowNodes.length && !focused; j++) {
                     if (dojoClass.contains(this._grid._gridRowNodes[j], "selected")) {
-                        this._transferFocus(fromRow, this._grid._gridRowNodes[j], true);
+                        this._transferFocus(this._grid._gridRowNodes[j], true);
                         focused = true;
                     } else {
                         set.push(this._grid._gridRowNodes[j]);
@@ -257,7 +261,7 @@ define([
             if (set.length > 0) {
                 this._selectRowsInSet(set);
                 if (!focused) {
-                    this._transferFocus(fromRow, set[set.length - 1], false);
+                    this._transferFocus(set[set.length - 1], false);
                 }
             }
 
@@ -267,14 +271,16 @@ define([
          * Transfer Focus
          * ---
          * Transfer the focus to a new row
-         * @param {HTMLElement} fromRow - the row that is currently focused
          * @param {HTMLElement} toRow - the row that should be focused
          * @param {Boolean} resetAnchor - if true, resets the anchor to the newly focused row
          * @author Conner Charlebois
          * @since Nov 21, 2017
          */
-        _transferFocus: function(fromRow, toRow, resetAnchor) {
-            dojoClass.remove(fromRow, "mx-focus");
+        _transferFocus: function(toRow, resetAnchor) {
+            this._grid._gridRowNodes.forEach(dojoLang.hitch(this, function(row) {
+                dojoClass.remove(row, "mx-focus");
+            }));
+            // dojoClass.remove(fromRow, "mx-focus");
             dojoClass.add(toRow, "mx-focus");
             if (resetAnchor) {
                 this._resetAnchorPosition(toRow);
@@ -293,6 +299,40 @@ define([
             this._anchorRow = anchorRow;
             this._direction = null;
         },
+
+        _moveSelection: function(toRow) {
+            this._removeRowsInSet(this._grid._gridRowNodes);
+            this._addToSelection(toRow);
+            this._transferFocus(toRow, true);
+        },
+
+        /**
+         * Add to Selection
+         * ---
+         * Add a single row to the selection
+         * @param {HTMLElement} row - the row whose object should be added to the selection
+         * @author Conner Charlebois
+         * @since Nov 21, 2017
+         */
+        _addToSelection: function(row) {
+            var obj = this._grid._getObjectFromNode(row);
+            this._grid._addToSelection(obj.getGuid());
+            this._grid.selectRow(row);
+        },
+
+        /**
+         * Remove from Selection
+         * ---
+         * Remove a single row from the selection
+         * @param {HTMLElement} row - the row whose object should be removed from the selection
+         * @author Conner Charlebois
+         * @since Nov 21, 2017
+         */
+        _removeFromSelection: function(row) {
+            var obj = this._grid._getObjectFromNode(row);
+            this._grid._removeFromSelection(obj.getGuid());
+            this._grid.deselectRow(row);
+        }
     });
 });
 
