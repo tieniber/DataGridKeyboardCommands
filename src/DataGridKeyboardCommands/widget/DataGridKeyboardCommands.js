@@ -97,11 +97,9 @@ define([
                 rowToSelect = shiftKeyPressed ? (key === this.KEY_DOWN ? focusRow.nextSibling : focusRow.previousSibling) : (key === this.KEY_DOWN ? lastSelected.nextSibling : firstSelected.previousSibling);
                 if (shiftKeyPressed && modKeyPressed) {
                     this._doJumpSelect(focusRow, key);
-                } else if (shiftKeyPressed) {
+                } else if (shiftKeyPressed && rowToSelect) {
                     if (focusRow && dojoClass.contains(focusRow, "selected")) {
-                        if (rowToSelect) {
-                            this._toggleSelectedRow(focusRow, rowToSelect, key);
-                        }
+                        this._toggleSelectedRow(focusRow, rowToSelect, key);
                     }
                 } else if (rowToSelect) {
                     rowToSelect = (key === this.KEY_DOWN ? lastSelected.nextSibling : firstSelected.previousSibling);
