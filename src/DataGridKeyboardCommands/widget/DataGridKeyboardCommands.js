@@ -45,7 +45,6 @@ define([
 
             if (this._grid) {
                 this._grid.connect(this._grid.domNode, "onkeydown", dojoLang.hitch(this, this._onKeyPress));
-                // setTimeout(dojoLang.hitch(this, this._attachListenersToGridRows), 500);
                 // wait for the _gridRowNodes to be defined
                 var wait = setInterval(dojoLang.hitch(this, function() {
                     if (this._grid._gridRowNodes) {
@@ -53,14 +52,6 @@ define([
                         clearInterval(wait);
                     }
                 }), 100);
-
-                // aspect.before(this._grid, "_addToSelection", dojoLang.hitch(this, function(method, args) {
-                //     var selectedRows = dojoQuery(".selected", this._grid.domNode);
-                //     if (selectedRows.length === 1) {
-                //         this._anchorRow = selectedRows[0];
-                //     }
-                // }));
-                // this._grid.connect(this._grid.domNode, "click", dojoLang.hitch(this, this._onClickRowNode));
             }
 
             if (callback) callback();
@@ -97,17 +88,22 @@ define([
             // shift is pressed and key is up or down
             if (shiftKeyPressed && (key === this.KEY_UP || key === this.KEY_DOWN)) {
                 this._direction = this._direction || key; //cache
+                var modKeyPressed = this._isMacintosh() ? e.metaKey : e.ctrlKey;
                 var focusRow = dojoQuery(".mx-focus", this._grid.domNode)[0];
-                // if the focus row is selected
-                if (focusRow && dojoClass.contains(focusRow, "selected")) {
-                    // find the next seelcted row
-                    if (key === this.KEY_DOWN) {
-                        rowToSelect = focusRow.nextSibling;
-                    } else if (key === this.KEY_UP) {
-                        rowToSelect = focusRow.previousSibling;
-                    }
-                    if (rowToSelect) {
-                        this._toggleSelectedRow(focusRow, rowToSelect, key);
+                if (modKeyPressed) {
+                    this._doJumpSelect(focusRow, key);
+                } else {
+                    // if the focus row is selected
+                    if (focusRow && dojoClass.contains(focusRow, "selected")) {
+                        // find the next seelcted row
+                        if (key === this.KEY_DOWN) {
+                            rowToSelect = focusRow.nextSibling;
+                        } else if (key === this.KEY_UP) {
+                            rowToSelect = focusRow.previousSibling;
+                        }
+                        if (rowToSelect) {
+                            this._toggleSelectedRow(focusRow, rowToSelect, key);
+                        }
                     }
                 }
             }
@@ -147,9 +143,7 @@ define([
                 this._grid._addToSelection(obj.getGuid());
                 this._grid.selectRow(toRow);
             }
-            dojoClass.remove(fromRow, "mx-focus");
-            dojoClass.add(toRow, "mx-focus");
-
+            this._transferFocus(fromRow, toRow, false);
             // if moving from anchor, reset the direction
             if (fromRow === this._anchorRow) {
                 this._direction = key;
@@ -191,8 +185,7 @@ define([
                         var a = this._anchorRow,
                             b = this._recursivelyFindTableRowParent(e.target),
                             collecting = false,
-                            set = [],
-                            obj = null;
+                            set = [];
                         Array.from(a.parentElement.children).forEach(dojoLang.hitch(this, function(element) {
                             if (element === a || element === b) {
                                 collecting = !collecting;
@@ -201,11 +194,7 @@ define([
                                 set.push(element);
                             }
                         }));
-                        set.forEach(dojoLang.hitch(this, function(tr) {
-                            obj = this._grid._getObjectFromNode(tr);
-                            this._grid._addToSelection(obj.getGuid());
-                            this._grid.selectRow(tr);
-                        }));
+                        this._selectRowsInSet(set);
                         document.getSelection().removeAllRanges(); // remove all the highlighted text from the DOM
                     }
                     this._anchorRow = this._recursivelyFindTableRowParent(e.target);
@@ -213,7 +202,97 @@ define([
 
                 }));
             }));
-        }
+        },
+
+        /**
+         * Select Rows In Set
+         * ---
+         * Select all the rows in a given array
+         * @param {Array::HTMLElement} set - the <tr> elements to select
+         * @author Conner Charlebois
+         * @since Nov 21, 2017
+         */
+        _selectRowsInSet: function(set) {
+            var obj;
+            set.forEach(dojoLang.hitch(this, function(tr) {
+                obj = this._grid._getObjectFromNode(tr);
+                this._grid._addToSelection(obj.getGuid());
+                this._grid.selectRow(tr);
+            }));
+        },
+
+        /**
+         * Do Jump Select
+         * ---
+         * Select all the rows between the current one and either the next selected row or the end of the table
+         * @param {HTMLElement} fromRow - the starting row of the jump select
+         * @param {Number} direction - the direction of the jump @see this._direction
+         * @author Conner Charlebois
+         * @since Nov 21, 2017
+         */
+        _doJumpSelect: function(fromRow, direction) {
+            // select everything between `fromRow` and either the next selected row in `direction` or the end of the list
+            var i = this._grid._gridRowNodes.indexOf(fromRow),
+                set = [],
+                focused = false;
+            if (direction === this.KEY_UP) {
+                for (var k = i - 1; k >= 0 && !focused; k--) {
+                    if (dojoClass.contains(this._grid._gridRowNodes[k], "selected")) {
+                        this._transferFocus(fromRow, this._grid._gridRowNodes[k], true);
+                        focused = true;
+                    } else {
+                        set.push(this._grid._gridRowNodes[k]);
+                    }
+                }
+            } else {
+                for (var j = i + 1; j < this._grid._gridRowNodes.length && !focused; j++) {
+                    if (dojoClass.contains(this._grid._gridRowNodes[j], "selected")) {
+                        this._transferFocus(fromRow, this._grid._gridRowNodes[j], true);
+                        focused = true;
+                    } else {
+                        set.push(this._grid._gridRowNodes[j]);
+                    }
+                }
+            }
+            if (set.length > 0) {
+                this._selectRowsInSet(set);
+                if (!focused) {
+                    this._transferFocus(fromRow, set[set.length - 1], false);
+                }
+            }
+
+        },
+
+        /**
+         * Transfer Focus
+         * ---
+         * Transfer the focus to a new row
+         * @param {HTMLElement} fromRow - the row that is currently focused
+         * @param {HTMLElement} toRow - the row that should be focused
+         * @param {Boolean} resetAnchor - if true, resets the anchor to the newly focused row
+         * @author Conner Charlebois
+         * @since Nov 21, 2017
+         */
+        _transferFocus: function(fromRow, toRow, resetAnchor) {
+            dojoClass.remove(fromRow, "mx-focus");
+            dojoClass.add(toRow, "mx-focus");
+            if (resetAnchor) {
+                this._resetAnchorPosition(toRow);
+            }
+        },
+
+        /**
+         * Reset Anchor Position
+         * ---
+         * Reset the anchor to the specified row, and reset the direction
+         * @param {HTMLElement} anchorRow - the new row to anchor
+         * @author Conner Charlebois
+         * @since Nove 21, 2017
+         */
+        _resetAnchorPosition: function(anchorRow) {
+            this._anchorRow = anchorRow;
+            this._direction = null;
+        },
     });
 });
 
