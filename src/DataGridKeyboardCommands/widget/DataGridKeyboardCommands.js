@@ -25,12 +25,14 @@ define([
         _contextObj: null,
         _grid: null,
         _anchorRow: null,
+		_anchorStack: null,
 
         KEY_UP: 38,
         KEY_DOWN: 40,
 
         constructor: function() {
             this._handles = [];
+			this._anchorRowStack = [];
         },
 
         postCreate: function() {
@@ -104,7 +106,10 @@ define([
                 } else if (rowToSelect) {
                     rowToSelect = (key === this.KEY_DOWN ? lastSelected.nextSibling : firstSelected.previousSibling);
                     this._moveSelection(rowToSelect);
-                }
+                } else {
+					rowToSelect = (key === this.KEY_DOWN ? lastSelected : firstSelected);
+                    this._moveSelection(rowToSelect);
+				}
             }
         },
         _isMacintosh: function() {
@@ -130,7 +135,7 @@ define([
             var obj;
             if (dojoClass.contains(toRow, "selected") && key !== this._direction) {
                 // deselect
-                this._removeFromSelection(fromRow)
+                this._removeFromSelection(fromRow);
             } else if (!dojoClass.contains(toRow, "selected")) {
                 // add
                 this._addToSelection(toRow);
@@ -141,6 +146,20 @@ define([
                 this._direction = key;
             }
         },
+
+		/**
+		 * Toggle selection of the given row
+		 * Returns true if selection is made, false if deselection
+		**/
+		_toggleSelection: function(row) {
+			if (dojoClass.contains(row, "selected")) {
+                this._removeFromSelection(row);
+				return false;
+            } else {
+                this._addToSelection(row);
+				return true;
+            }
+		},
 
         /**
          * Recursively Find Table Row Parent
@@ -168,33 +187,62 @@ define([
          */
         _attachListenersToGridRows: function() {
             this._grid._gridRowNodes.forEach(dojoLang.hitch(this, function(node) {
-                this.connect(node, "click", dojoLang.hitch(this, function(e) {
-                    if (e.shiftKey && this._anchorRow) {
-                        // cancel the bubble --> disable the mendix events
-                        e.cancelBubble = true;
-                        // shift key was clicked, select everything between the focused row and this one
-                        console.log("shifty");
-                        var a = this._anchorRow,
-                            b = this._recursivelyFindTableRowParent(e.target),
-                            collecting = false,
-                            set = [];
-                        Array.from(a.parentElement.children).forEach(dojoLang.hitch(this, function(element) {
-                            if (element === a || element === b) {
-                                collecting = !collecting;
-                                set.push(element);
-                            } else if (collecting) {
-                                set.push(element);
-                            }
-                        }));
-                        this._selectRowsInSet(set);
-                        document.getSelection().removeAllRanges(); // remove all the highlighted text from the DOM
-                    }
-                    var newAnchor = this._recursivelyFindTableRowParent(e.target);
-                    this._resetAnchorPosition(newAnchor);
-
+				this.connect(node, "click", dojoLang.hitch(this, function(e) {
+                    this._onRowClick(e);
                 }));
             }));
         },
+
+		_onRowClick: function(e) {
+			var targetRow = this._recursivelyFindTableRowParent(e.target),
+			modKeyPressed = this._isMacintosh() ? e.metaKey : e.ctrlKey;
+
+			// cancel the bubble --> disable the mendix events
+			e.cancelBubble = true;
+			if (e.shiftKey && this._anchorRow) {
+				// shift key was clicked, select everything between the focused row and this one
+				console.log("shifty");
+				var a = this._anchorRow,
+					collecting = false,
+					set = [];
+				Array.from(a.parentElement.children).forEach(dojoLang.hitch(this, function(element) {
+					if (element === a || element === targetRow) {
+						collecting = !collecting;
+						set.push(element);
+					} else if (collecting) {
+						set.push(element);
+					}
+				}));
+				this._selectRowsInSet(set);
+				document.getSelection().removeAllRanges(); // remove all the highlighted text from the DOM
+				this._transferFocus(targetRow, false);
+			} else if (modKeyPressed) {
+				this._transferFocus(targetRow, true);
+				var selected = this._toggleSelection(targetRow);
+				if(selected) { //row was selected
+					if (this._anchorRow) {
+						this._anchorRowStack.push(this._anchorRow); //save the current anchor
+					}
+					this._anchorRow = targetRow;
+					this._direction = null;
+				} else {
+					if(this._anchorRowStack.length > 0) {
+						var newAnchor = this._anchorRowStack.pop(); //get the previous anchor
+						this._anchorRow = newAnchor;
+						this._direction = null;
+					} else {
+						this._anchorRow = null;
+						this._direction = null;
+					}
+				}
+
+
+				//e.cancelBubble = false;
+			} else {
+				this._transferFocus(targetRow, true);
+				this._moveSelection(targetRow);
+			}
+		},
 
         /**
          * Select Rows In Set
@@ -295,6 +343,7 @@ define([
          */
         _resetAnchorPosition: function(anchorRow) {
             this._anchorRow = anchorRow;
+			this._anchorRowStack = [];
             this._direction = null;
         },
 
