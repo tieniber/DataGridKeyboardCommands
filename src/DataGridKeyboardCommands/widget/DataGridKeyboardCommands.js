@@ -50,11 +50,11 @@ define([
                 this._grid.connect(this._grid.contentNode, "onkeydown", dojoLang.hitch(this, this._onKeyPress));
                 // wait for the _gridRowNodes to be defined
                 var wait = setInterval(dojoLang.hitch(this, function() {
-                    if (this._grid._gridRowNodes) {
+                    if (Array.isArray(this._grid._gridRowNodes) && this._grid._gridRowNodes.length > 0) {
                         this._attachListenersToGridRows();
                         clearInterval(wait);
                     }
-                }), 100);
+                }), 200);
             }
 
             if (callback) callback();
@@ -107,7 +107,7 @@ define([
                 } else if (rowToSelect) {
                     rowToSelect = (key === this.KEY_DOWN ? lastSelected.nextSibling : firstSelected.previousSibling);
                     this._moveSelection(rowToSelect);
-                } else {
+                } else if (!shiftKeyPressed) {
                     rowToSelect = (key === this.KEY_DOWN ? lastSelected : firstSelected);
                     this._moveSelection(rowToSelect);
                 }
