@@ -438,6 +438,8 @@ define([
         /**
          * Add to Selection
          * ---
+         * @since Dec 11, 2017
+         * - Add call to datagrid._shareSelection, which updates listening DVs
          * Add a single row to the selection
          * @param {HTMLElement} row - the row whose object should be added to the selection
          * @author Conner Charlebois
@@ -447,11 +449,14 @@ define([
             var obj = this._grid._getObjectFromNode(row);
             this._grid._addToSelection(obj.getGuid());
             this._grid.selectRow(row);
+            this._grid._shareSelection(this._grid._metaEntity.getEntity());
         },
 
         /**
          * Remove from Selection
          * ---
+         * @since Dec 11, 2017
+         * - Add call to datagrid._shareSelection, which updates listening DVs
          * Remove a single row from the selection
          * @param {HTMLElement} row - the row whose object should be removed from the selection
          * @author Conner Charlebois
@@ -461,6 +466,7 @@ define([
             var obj = this._grid._getObjectFromNode(row);
             this._grid._removeFromSelection(obj.getGuid());
             this._grid.deselectRow(row);
+            this._grid._shareSelection(this._grid._metaEntity.getEntity());
         }
     });
 });

@@ -1,12 +1,11 @@
 {
   "name": "DataGridKeyboardCommands",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Enables a multi-select data grid with shift/control + arrow key functionality, plus shift+click to select multiple rows",
   "license": "Apache 2",
   "author": "Eric Tieniber",
   "private": true,
-  "dependencies": {
-  },
+  "dependencies": {},
   "devDependencies": {
     "del": "^2.2.2",
     "gulp": "^3.9.1",
