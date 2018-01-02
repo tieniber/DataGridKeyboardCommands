@@ -50,8 +50,12 @@ define([
                     };
                     var toInteger = function(value) {
                         var number = Number(value);
-                        if (isNaN(number)) { return 0; }
-                        if (number === 0 || !isFinite(number)) { return number; }
+                        if (isNaN(number)) {
+                            return 0;
+                        }
+                        if (number === 0 || !isFinite(number)) {
+                            return number;
+                        }
                         return (number > 0 ? 1 : -1) * Math.floor(Math.abs(number));
                     };
                     var maxSafeInteger = Math.pow(2, 53) - 1;
@@ -429,8 +433,17 @@ define([
             this._direction = null;
         },
 
+        /**
+         * Move Selection
+         * ---
+         * Deselects everything, then moves the selection to the specified row
+         * 
+         * @author Conner Charlebois
+         * @since Jan 2, 2018
+         */
         _moveSelection: function(toRow) {
-            this._removeRowsInSet(this._grid._gridRowNodes);
+            // this._removeRowsInSet(this._grid._gridRowNodes);
+            this._grid.actionClearSelection();
             this._addToSelection(toRow);
             this._transferFocus(toRow, true);
         },
@@ -455,6 +468,8 @@ define([
         /**
          * Remove from Selection
          * ---
+         * @since Jan 2, 2018
+         * - Add check to only remove objects from the selection and not the empty rows at the bottom.
          * @since Dec 11, 2017
          * - Add call to datagrid._shareSelection, which updates listening DVs
          * Remove a single row from the selection
@@ -464,6 +479,7 @@ define([
          */
         _removeFromSelection: function(row) {
             var obj = this._grid._getObjectFromNode(row);
+            if (!obj) return;
             this._grid._removeFromSelection(obj.getGuid());
             this._grid.deselectRow(row);
             this._grid._shareSelection(this._grid._metaEntity.getEntity());
