@@ -235,17 +235,40 @@ define([
         },
 
         /**
-         * Toggle selection of the given row
-         * Returns true if selection is made, false if deselection
-         **/
+         * Toggle Selection
+         * ---
+         * Toggle the selection of a given row
+         * @param {HTMLElement} row - the row to toggle
+         * @returns {Boolean} - true if the row's object is now in the selection
+         * @author Conner Charlebois
+         * @since Jan 2, 2018
+         */
         _toggleSelection: function(row) {
-            if (dojoClass.contains(row, "selected")) {
-                this._removeFromSelection(row);
-                return false;
+            var normalGrid = !this._grid._gridState.invertedSelection,
+                selected = null;
+            if (normalGrid) {
+                if (dojoClass.contains(row, "selected")) {
+                    // deselect
+                    this._removeFromSelection(row);
+                    selected = false;
+                } else {
+                    // select
+                    this._addToSelection(row);
+                    selected = true;
+                }
             } else {
-                this._addToSelection(row);
-                return true;
+                // the upside-down!
+                if (dojoClass.contains(row, "selected")) {
+                    // select
+                    this._addToSelection(row);
+                    selected = false;
+                } else {
+                    // deselect
+                    this._removeFromSelection(row);
+                    selected = true;
+                }
             }
+            return selected;
         },
 
         /**
@@ -442,7 +465,6 @@ define([
          * @since Jan 2, 2018
          */
         _moveSelection: function(toRow) {
-            // this._removeRowsInSet(this._grid._gridRowNodes);
             this._grid.actionClearSelection();
             this._addToSelection(toRow);
             this._transferFocus(toRow, true);
